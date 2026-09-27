@@ -43,13 +43,20 @@ header h1{font-size:28px;flex:1}
 #sendPanel{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:3px solid #000;padding:12px}
 #sendPanel label{display:block;margin:6px 0 4px;font-size:17px}
 #sendPanel .line{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-#sendPanel select{flex:1}
+#sendPanel .sel{flex:1}
 #sendStatus{font-size:16px;font-style:italic}
 #dlg{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;padding:16px}
 #dlgBox{border:3px solid #000;background:#fff;padding:18px;max-width:560px;width:100%}
 #dlgBox h2{font-size:24px;margin-bottom:12px}
 #dlgBox label{display:block;margin:10px 0 4px}
-#dlgBox input,#dlgBox select{width:100%}
+#dlgBox input,#dlgBox .sel{width:100%}
+.sel{text-align:left}
+#pick{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;padding:16px;z-index:30}
+#pickBox{border:3px solid #000;background:#fff;padding:18px;max-width:480px;width:100%;max-height:90%;overflow-y:auto}
+#pickBox h2{font-size:22px;margin-bottom:10px}
+#pickBox button{display:block;width:100%;margin-bottom:8px;text-align:left;font-size:20px}
+#dlg{z-index:20}
+#sendPanel{z-index:10}
 #dlgBtns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 #toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:#000;color:#fff;padding:12px 18px;border-radius:6px;font-size:18px}
 </style>
@@ -95,8 +102,8 @@ header h1{font-size:28px;flex:1}
     <button id="tPen" class="on">Stylo</button>
     <button id="tEraser">Gomme</button>
     <button id="tSelect">Sélection</button>
-    <select id="tWidth"><option value="2">Fin</option><option value="4" selected>Moyen</option><option value="8">Épais</option></select>
-    <select id="tBg"></select>
+    <button id="tWidth" class="sel"></button>
+    <button id="tBg" class="sel"></button>
     <button id="tUndo">↶</button>
     <button id="tRedo">↷</button>
     <span class="sep"></span>
@@ -114,7 +121,7 @@ header h1{font-size:28px;flex:1}
   <label>Texte reconnu (modifiable) <span id="sendStatus"></span></label>
   <textarea id="sendText"></textarea>
   <div class="line">
-    <select id="sendCat"></select>
+    <button id="sendCat" class="sel"></button>
     <button id="sendNewCat">+ Catégorie</button>
   </div>
   <div class="line">
@@ -126,6 +133,7 @@ header h1{font-size:28px;flex:1}
 
 <div id="dlg" class="hidden"><div id="dlgBox"></div></div>
 <div id="toast" class="hidden"></div>
+<div id="pick" class="hidden"><div id="pickBox"></div></div>
 
 <script>
 (function(){
@@ -302,13 +310,14 @@ function entryDialog(e){
   var isNew=!e;
   dialog(isNew?'Nouveau texte':'Modifier',
     '<label>Texte</label><textarea id="dX">'+esc(e?e.text:'')+'</textarea>'+
-    '<label>Catégorie</label><select id="dC">'+catOptions(e?e.cat:S.catOpen)+'</select>',
+    '<label>Catégorie</label><button id="dC" class="sel"></button>',
     [{label:'Annuler'},{label:'Enregistrer',primary:true,action:function(){
       var t=$('dX').value.trim(); if(!t) return false;
-      if(isNew){ S.index.entries.push({id:uid(),cat:$('dC').value,text:t,noteId:null,page:0,box:null,created:Date.now(),done:false}); }
-      else { e.text=t; e.cat=$('dC').value; }
+      if(isNew){ S.index.entries.push({id:uid(),cat:getSel('dC'),text:t,noteId:null,page:0,box:null,created:Date.now(),done:false}); }
+      else { e.text=t; e.cat=getSel('dC'); }
       saveIndex(); renderEntries();
     }}]);
+  bindSel('dC','Catégorie',catList,e?e.cat:S.catOpen);
 }
 
 /* ---------- Boîte de dialogue ---------- */
@@ -322,6 +331,28 @@ function dialog(title,bodyHtml,buttons){
     $('dlg').className='hidden';
   }; })(buttons[i]);
 }
+/* ---------- Listes de choix (remplacent les menus déroulants) ---------- */
+var WIDTHS=[['2','Fin'],['4','Moyen'],['8','Épais']];
+function catList(){ return S.index.cats.map(function(c){ return [c,c]; }); }
+function labelOf(opts,v){ for(var i=0;i<opts.length;i++) if(opts[i][0]===v) return opts[i][1]; return v||'—'; }
+function setSel(el,opts,v){ el.setAttribute('data-v',v); el.innerHTML=esc(labelOf(opts,v))+' ▾'; }
+function getSel(id){ return $(id).getAttribute('data-v'); }
+function pickFrom(title,opts,cur,cb){
+  var h='<h2>'+esc(title)+'</h2>';
+  opts.forEach(function(o,i){ h+='<button data-i="'+i+'" class="'+(o[0]===cur?'on':'')+'">'+esc(o[1])+'</button>'; });
+  h+='<button data-i="-1">Annuler</button>';
+  $('pickBox').innerHTML=h; $('pick').className='';
+  $('pickBox').onclick=function(e){
+    var b=e.target; if(b.tagName!=='BUTTON') return;
+    var i=+b.getAttribute('data-i'); $('pick').className='hidden';
+    if(i>=0) cb(opts[i][0]);
+  };
+}
+// transforme un bouton en sélecteur ; optsFn renvoie la liste [valeur, libellé]
+function bindSel(id,title,optsFn,cur,onChange){
+  var el=$(id); setSel(el,optsFn(),cur);
+  el.onclick=function(){ pickFrom(title,optsFn(),el.getAttribute('data-v'),function(v){ setSel(el,optsFn(),v); if(onChange) onChange(v); }); };
+}
 function catOptions(sel){
   return S.index.cats.map(function(c){ return '<option'+(c===sel?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
 }
@@ -331,13 +362,14 @@ function bgOptions(sel){
 function newNoteDialog(){
   dialog('Nouvelle note',
     '<label>Titre</label><input id="dT" type="text" value="Note du '+fmtDate(Date.now())+'">'+
-    '<label>Style de feuille</label><select id="dB">'+bgOptions('lines')+'</select>',
+    '<label>Style de feuille</label><button id="dB" class="sel"></button>',
     [{label:'Annuler'},{label:'Créer',primary:true,action:function(){
-      var n={ id:uid(), title:($('dT').value||'Sans titre').trim(), bg:$('dB').value, created:Date.now(), updated:Date.now() };
+      var n={ id:uid(), title:($('dT').value||'Sans titre').trim(), bg:getSel('dB'), created:Date.now(), updated:Date.now() };
       S.index.notes.push(n); saveIndex();
       lsSet('kn_note_'+n.id, JSON.stringify({pages:[[]],bgs:[n.bg],checks:[{}]}));
       openNote(n.id,0);
     }}]);
+  bindSel('dB','Style de feuille',function(){ return BGS; },'lines');
 }
 function addCatDialog(after){
   dialog('Nouvelle catégorie','<label>Nom</label><input id="dN" type="text">',
@@ -393,10 +425,12 @@ function backupDialog(){
 }
 
 /* ---------- Éditeur ---------- */
-var pad=$('pad'), pctx=pad.getContext('2d'), scale=1;
+var pad=$('pad'), pctx=null, scale=1;
+try{ pctx=pad.getContext('2d',{desynchronized:true,alpha:false}); }catch(e){}
+if(!pctx) pctx=pad.getContext('2d');
 function layoutPad(){
   var bar=$('bar').offsetHeight;
-  var w=Math.min(window.innerWidth-20,(window.innerHeight-bar-20)*PW/PH), h=w*PH/PW, dpr=window.devicePixelRatio||1;
+  var w=Math.min(window.innerWidth-20,(window.innerHeight-bar-20)*PW/PH), h=w*PH/PW, dpr=1;   // résolution réduite = affichage plus rapide sur e-ink
   pad.style.width=Math.floor(w)+'px'; pad.style.height=Math.floor(h)+'px';
   pad.width=Math.floor(w*dpr); pad.height=Math.floor(h*dpr);
   scale=pad.width/PW; redraw();
@@ -420,7 +454,7 @@ function redraw(){
     dashRect(pctx,S.sel.box,'#000',3);
   }
   $('pageInfo').innerHTML=(S.page+1)+'/'+S.data.pages.length;
-  $('tBg').value=S.data.bgs[S.page];
+  setSel($('tBg'),BGS,S.data.bgs[S.page]);
 }
 function openNote(id,page){
   S.cur=findNote(id); S.data=loadNote(id); S.page=Math.min(page||0,S.data.pages.length-1); S.undo=[]; S.redo=[]; S.sel=null;
@@ -491,7 +525,7 @@ function start(pt,erase){
   if(t==='select'){ S.sel=null; redraw(); S.drawing={lasso:[pt[0],pt[1]]}; return; }
   snapshot();
   if(t==='eraser'){ S.drawing={erase:true}; eraseAt(pt[0],pt[1]); return; }
-  S.drawing={s:{w:S.width,p:[pt[0],pt[1]]}};
+  S.drawing={s:{w:S.width,p:[pt[0],pt[1]]}, drawn:0};
   strokes().push(S.drawing.s);
   pctx.setTransform(scale,0,0,scale,0,0); drawStroke(pctx,S.drawing.s);
 }
@@ -507,10 +541,23 @@ function move(pt){
   if(Math.abs(pt[0]-lx)+Math.abs(pt[1]-ly)<(d.lasso?6:2)) return;
   p.push(pt[0],pt[1]);
   if(d.lasso){ if((p.length/2)%2===0) seg(lx,ly,pt[0],pt[1],2); }   // trait pointillé
-  else seg(lx,ly,pt[0],pt[1],d.s.w);
+  else if(!flushReq){ flushReq=true; (window.requestAnimationFrame||setTimeout)(flush); }
+}
+// dessine d'un coup tous les points reçus depuis la dernière image
+var flushReq=false;
+function flush(){
+  flushReq=false;
+  var d=S.drawing; if(!d || !d.s) return;
+  var p=d.s.p; if(p.length-2<=d.drawn) return;
+  pctx.setTransform(scale,0,0,scale,0,0);
+  pctx.strokeStyle='#000'; pctx.lineWidth=d.s.w; pctx.lineCap='round'; pctx.lineJoin='round';
+  pctx.beginPath(); pctx.moveTo(p[d.drawn],p[d.drawn+1]);
+  for(var i=d.drawn+2;i<p.length;i+=2) pctx.lineTo(p[i],p[i+1]);
+  pctx.stroke(); d.drawn=p.length-2;
 }
 function end(){
   var d=S.drawing; if(!d) return;
+  if(d.s) flush();
   S.drawing=null;
   if(d.lasso){ finishLasso(d.lasso); return; }
   if(d.erase && S.undo.length){ var last=S.undo[S.undo.length-1]; if(last.strokes.length===strokes().length) S.undo.pop(); }
@@ -596,7 +643,7 @@ function recognize(list,cb){
 /* ---------- Panneau d'envoi ---------- */
 var recogToken=0;
 function openSend(){
-  $('sendCat').innerHTML=catOptions(S.lastCat||S.index.cats[0]);
+  bindSel('sendCat','Envoyer dans…',catList,S.lastCat||S.index.cats[0]||'');
   $('sendText').value=''; $('sendPanel').className='';
   runRecog();
 }
@@ -613,13 +660,13 @@ function runRecog(){
 function closeSend(){ recogToken++; $('sendPanel').className='hidden'; if(S.sel){ S.sel=null; if(S.data) redraw(); } }
 $('sendRetry').onclick=runRecog;
 $('sendCancel').onclick=closeSend;
-$('sendNewCat').onclick=function(){ addCatDialog(function(v){ $('sendCat').innerHTML=catOptions(v); }); };
+$('sendNewCat').onclick=function(){ addCatDialog(function(v){ setSel($('sendCat'),catList(),v); }); };
 $('sendOk').onclick=function(){
   var t=$('sendText').value.trim();
   if(!S.sel) return;
   if(!t){ alert('Le texte est vide.'); return; }
   if(!S.index.cats.length){ alert('Créez d\'abord une catégorie.'); return; }
-  var c=$('sendCat').value; S.lastCat=c;
+  var c=getSel('sendCat'); S.lastCat=c;
   S.index.entries.push({id:uid(),cat:c,text:t,noteId:S.cur.id,page:S.page,box:S.sel.box,created:Date.now(),done:false});
   saveIndex(); closeSend(); toast('Envoyé dans « '+c+' »');
 };
@@ -656,9 +703,8 @@ $('noteTitle').onchange=function(){ S.cur.title=(this.value||'Sans titre').trim(
 $('tPen').onclick=function(){ closeSend(); setTool('pen'); };
 $('tEraser').onclick=function(){ closeSend(); setTool('eraser'); };
 $('tSelect').onclick=function(){ setTool('select'); };
-$('tWidth').onchange=function(){ S.width=+this.value; };
-$('tBg').innerHTML=bgOptions('lines');
-$('tBg').onchange=function(){ S.data.bgs[S.page]=this.value; S.cur.bg=this.value; saveNoteSoon(); redraw(); };
+bindSel('tWidth','Épaisseur du trait',function(){ return WIDTHS; },'4',function(v){ S.width=+v; });
+bindSel('tBg','Style de feuille',function(){ return BGS; },'lines',function(v){ S.data.bgs[S.page]=v; S.cur.bg=v; saveNoteSoon(); redraw(); });
 $('tUndo').onclick=function(){ restore(S.undo,S.redo); };
 $('tRedo').onclick=function(){ restore(S.redo,S.undo); };
 $('pPrev').onclick=function(){ if(S.page>0) goPage(S.page-1); };
