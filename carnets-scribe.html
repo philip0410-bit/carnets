@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Carnets Scribe</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff;color:#000;font-family:Georgia,serif;font-size:20px;height:100%}
+button,select,input,textarea{font-family:inherit;font-size:18px;color:#000;background:#fff;border:2px solid #000;border-radius:6px;padding:8px 12px;min-height:48px}
+textarea{width:100%;min-height:110px;resize:vertical}
+button.on{background:#000;color:#fff}
+.hidden{display:none!important}
+header{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:3px solid #000;flex-wrap:wrap}
+header h1{font-size:28px;flex:1}
+#tabs{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #000}
+#tabs button{flex:1}
+.row{padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap}
+.row input{flex:1}
+#grid{display:flex;flex-wrap:wrap;gap:14px;padding:12px}
+.card{width:180px;border:2px solid #000;border-radius:6px;padding:6px;background:#fff;text-align:left}
+.card canvas{width:164px;height:218px;border:1px solid #000;display:block;margin-bottom:6px}
+.card b{display:block;font-size:17px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.card small{font-size:14px;display:block}
+.empty{padding:30px 12px;font-size:20px}
+#catList{padding:12px;display:flex;flex-direction:column;gap:10px}
+#catList button.cat{display:flex;justify-content:space-between;text-align:left;font-size:22px;padding:14px 16px}
+#entries{padding:12px;display:flex;flex-direction:column;gap:12px}
+.entry{border:2px solid #000;border-radius:6px;padding:10px;display:flex;gap:10px}
+.entry .chk{min-width:48px;font-size:22px;padding:0}
+.entry .body{flex:1}
+.entry .txt{white-space:pre-wrap;font-size:20px;margin-bottom:6px}
+.entry.done .txt{text-decoration:line-through}
+.entry .meta{font-size:14px;margin-bottom:8px}
+.entry .acts{display:flex;gap:6px;flex-wrap:wrap}
+.entry .acts button{font-size:15px;min-height:40px;padding:4px 10px}
+#bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 8px;border-bottom:3px solid #000}
+#bar .sep{width:1px;height:40px;background:#000;margin:0 2px}
+#noteTitle{flex:1;min-width:140px;font-weight:bold;border:none;border-bottom:2px solid #000;border-radius:0}
+#stage{display:flex;justify-content:center;padding:8px}
+#pad{border:2px solid #000;touch-action:none;-ms-touch-action:none;display:block;background:#fff}
+#pageInfo{min-width:60px;text-align:center}
+#sendPanel{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:3px solid #000;padding:12px}
+#sendPanel label{display:block;margin:6px 0 4px;font-size:17px}
+#sendPanel .line{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#sendPanel select{flex:1}
+#sendStatus{font-size:16px;font-style:italic}
+#dlg{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+#dlgBox{border:3px solid #000;background:#fff;padding:18px;max-width:560px;width:100%}
+#dlgBox h2{font-size:24px;margin-bottom:12px}
+#dlgBox label{display:block;margin:10px 0 4px}
+#dlgBox input,#dlgBox select{width:100%}
+#dlgBtns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:#000;color:#fff;padding:12px 18px;border-radius:6px;font-size:18px}
+</style>
+</head>
+<body>
+
+<!-- ACCUEIL -->
+<div id="lib">
+  <header>
+    <h1>Carnets</h1>
+    <button id="btnMenu">Sauvegarde</button>
+  </header>
+  <div id="tabs"><button id="tabNotes" class="on">Notes manuscrites</button><button id="tabCats">Catégories</button></div>
+
+  <div id="viewNotes">
+    <div class="row"><input id="q" type="text" placeholder="Rechercher une note…"><button id="btnNew" class="on">+ Nouvelle note</button></div>
+    <div id="grid"></div>
+  </div>
+
+  <div id="viewCats" class="hidden">
+    <div class="row"><button id="btnCatAdd" class="on">+ Nouvelle catégorie</button></div>
+    <div id="catList"></div>
+  </div>
+</div>
+
+<!-- CATÉGORIE (texte dactylographié) -->
+<div id="catView" class="hidden">
+  <header>
+    <button id="btnCatBack">← Retour</button>
+    <h1 id="catName"></h1>
+    <button id="btnCatWrite">+ Écrire</button>
+    <button id="btnCatEdit">Renommer / supprimer</button>
+  </header>
+  <div id="entries"></div>
+</div>
+
+<!-- ÉDITEUR -->
+<div id="ed" class="hidden">
+  <div id="bar">
+    <button id="btnBack">← Carnets</button>
+    <input id="noteTitle" type="text">
+    <span class="sep"></span>
+    <button id="tPen" class="on">Stylo</button>
+    <button id="tEraser">Gomme</button>
+    <button id="tSelect">Sélection</button>
+    <select id="tWidth"><option value="2">Fin</option><option value="4" selected>Moyen</option><option value="8">Épais</option></select>
+    <select id="tBg"></select>
+    <button id="tUndo">↶</button>
+    <button id="tRedo">↷</button>
+    <span class="sep"></span>
+    <button id="pPrev">‹</button>
+    <span id="pageInfo">1/1</span>
+    <button id="pNext">›</button>
+    <button id="pAdd">+ Page</button>
+    <button id="pMore">…</button>
+  </div>
+  <div id="stage"><canvas id="pad"></canvas></div>
+</div>
+
+<!-- PANNEAU D'ENVOI VERS UNE CATÉGORIE -->
+<div id="sendPanel" class="hidden">
+  <label>Texte reconnu (modifiable) <span id="sendStatus"></span></label>
+  <textarea id="sendText"></textarea>
+  <div class="line">
+    <select id="sendCat"></select>
+    <button id="sendNewCat">+ Catégorie</button>
+  </div>
+  <div class="line">
+    <button id="sendCancel">Annuler</button>
+    <button id="sendRetry">Relancer la reconnaissance</button>
+    <button id="sendOk" class="on">Envoyer</button>
+  </div>
+</div>
+
+<div id="dlg" class="hidden"><div id="dlgBox"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+(function(){
+"use strict";
+var PW = 1000, PH = 1333;
+var CK_Y0=130, CK_STEP=60, CK_X=46, CK_S=36;   // cases à cocher
+var BGS = [['blank','Vierge'],['lines','Lignes'],['checklist','Cases à cocher'],['grid','Quadrillage'],['dots','Points'],['cornell','Cornell'],['twocol','Deux colonnes'],['week','Semaine']];
+var S = { index:null, cur:null, data:null, page:0, tool:'pen', width:4, undo:[], redo:[],
+          q:'', tab:'notes', catOpen:null, penSeen:false, drawing:null, sel:null };
+
+function $(id){ return document.getElementById(id); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function fmtDate(t){ var d=new Date(t); return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear(); }
+function toast(msg){ var t=$('toast'); t.innerHTML=esc(msg); t.className=''; setTimeout(function(){ t.className='hidden'; },2200); }
+
+/* ---------- Stockage ---------- */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ alert('Impossible d\'enregistrer (mémoire pleine ou bloquée). Faites une sauvegarde.'); return false; } }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function loadIndex(){
+  try{ S.index = JSON.parse(lsGet('kn_index')); }catch(e){ S.index=null; }
+  if(!S.index || !S.index.notes) S.index = { cats:['Message à envoyer','Projet01','Boulot'], notes:[], entries:[] };
+  if(!S.index.entries) S.index.entries=[];
+}
+function saveIndex(){ lsSet('kn_index', JSON.stringify(S.index)); }
+function loadNote(id){
+  var d=null; try{ d = JSON.parse(lsGet('kn_note_'+id)); }catch(e){}
+  if(!d || !d.pages || !d.pages.length) d = { pages:[[]] };
+  var n=findNote(id), def=(n&&n.bg)||'lines';
+  if(!d.bgs) d.bgs=[];
+  if(!d.checks) d.checks=[];
+  for(var c=0;c<d.pages.length;c++) if(!d.checks[c]) d.checks[c]={};
+  for(var i=0;i<d.pages.length;i++) if(!d.bgs[i]) d.bgs[i]=def;
+  return d;
+}
+var saveTimer=null;
+function saveNoteSoon(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(saveNoteNow,400); }
+function saveNoteNow(){
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
+  if(!S.cur) return;
+  S.cur.updated=Date.now();
+  lsSet('kn_note_'+S.cur.id, JSON.stringify(S.data));
+  saveIndex();
+}
+function findNote(id){ for(var i=0;i<S.index.notes.length;i++) if(S.index.notes[i].id===id) return S.index.notes[i]; return null; }
+function findEntry(id){ for(var i=0;i<S.index.entries.length;i++) if(S.index.entries[i].id===id) return S.index.entries[i]; return null; }
+
+/* ---------- Fonds de page ---------- */
+function hl(ctx,y,x0,x1){ ctx.moveTo(x0,y); ctx.lineTo(x1,y); }
+function vl(ctx,x,y0,y1){ ctx.moveTo(x,y0); ctx.lineTo(x,y1); }
+function drawBg(ctx,bg){
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,PW,PH);
+  ctx.strokeStyle='#999'; ctx.fillStyle='#777'; ctx.lineWidth=1.2;
+  var x,y; ctx.beginPath();
+  if(bg==='lines'){ for(y=110;y<PH-20;y+=50) hl(ctx,y,40,PW-40); }
+  else if(bg==='grid'){ for(y=50;y<PH;y+=50) hl(ctx,y,0,PW); for(x=50;x<PW;x+=50) vl(ctx,x,0,PH); }
+  else if(bg==='dots'){ for(y=50;y<PH;y+=50) for(x=50;x<PW;x+=50) ctx.fillRect(x-2,y-2,4,4); }
+  else if(bg==='checklist'){
+    for(y=CK_Y0;y<PH-20;y+=CK_STEP){ hl(ctx,y,100,PW-40); ctx.rect(CK_X,y-CK_S-6,CK_S,CK_S); }
+  }
+  else if(bg==='cornell'){
+    for(y=210;y<PH-260;y+=50) hl(ctx,y,40,PW-40);
+    ctx.stroke(); ctx.beginPath(); ctx.strokeStyle='#555'; ctx.lineWidth=2;
+    hl(ctx,140,20,PW-20); vl(ctx,290,140,PH-230); hl(ctx,PH-230,20,PW-20);
+  }
+  else if(bg==='twocol'){
+    for(y=110;y<PH-20;y+=50){ hl(ctx,y,40,480); hl(ctx,y,520,PW-40); }
+    ctx.stroke(); ctx.beginPath(); ctx.strokeStyle='#555'; ctx.lineWidth=2; vl(ctx,500,60,PH-40);
+  }
+  else if(bg==='week'){
+    var jours=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'], h=(PH-60)/7;
+    ctx.font='22px Georgia'; ctx.fillStyle='#555';
+    for(var i=0;i<7;i++){ y=30+i*h; hl(ctx,y,20,PW-20); ctx.fillText(jours[i],30,y+28); }
+    hl(ctx,30+7*h,20,PW-20);
+  }
+  ctx.stroke();
+}
+function drawStroke(ctx,s,color){
+  var p=s.p; if(!p||p.length<2) return;
+  ctx.strokeStyle=color||'#000'; ctx.fillStyle=color||'#000';
+  ctx.lineWidth=s.w; ctx.lineCap='round'; ctx.lineJoin='round';
+  if(p.length===2){ ctx.beginPath(); ctx.arc(p[0],p[1],s.w/2,0,Math.PI*2); ctx.fill(); return; }
+  ctx.beginPath(); ctx.moveTo(p[0],p[1]);
+  for(var i=2;i<p.length;i+=2) ctx.lineTo(p[i],p[i+1]);
+  ctx.stroke();
+}
+function drawChecks(ctx,checks){
+  if(!checks) return;
+  ctx.save(); ctx.strokeStyle='#000'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.lineJoin='round';
+  for(var k in checks){ if(!checks[k]) continue;
+    var y=CK_Y0+k*CK_STEP-CK_S-6, x=CK_X;
+    ctx.beginPath(); ctx.moveTo(x+7,y+CK_S*0.55); ctx.lineTo(x+CK_S*0.42,y+CK_S-7); ctx.lineTo(x+CK_S-5,y+6); ctx.stroke();
+  }
+  ctx.restore();
+}
+function checkRowAt(x,y){
+  if(x<CK_X-14 || x>CK_X+CK_S+14) return -1;
+  var k=Math.round((y+CK_S/2+6-CK_Y0)/CK_STEP), cy=CK_Y0+k*CK_STEP-CK_S/2-6;
+  if(k<0 || CK_Y0+k*CK_STEP>=PH-20 || Math.abs(y-cy)>CK_S/2+10) return -1;
+  return k;
+}
+function renderPage(ctx,strokes,bg,checks){ drawBg(ctx,bg); if(bg==='checklist') drawChecks(ctx,checks); for(var i=0;i<strokes.length;i++) drawStroke(ctx,strokes[i]); }
+function dashRect(ctx,b,color,w){
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=w||2;
+  if(ctx.setLineDash) ctx.setLineDash([10,8]);
+  ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.restore();
+}
+
+/* ---------- Accueil ---------- */
+function setTab(t){
+  S.tab=t;
+  $('tabNotes').className=t==='notes'?'on':''; $('tabCats').className=t==='cats'?'on':'';
+  $('viewNotes').className=t==='notes'?'':'hidden'; $('viewCats').className=t==='cats'?'':'hidden';
+  if(t==='notes') renderGrid(); else renderCatList();
+}
+function renderGrid(){
+  var q=S.q.toLowerCase();
+  var list=S.index.notes.filter(function(n){ return !q || n.title.toLowerCase().indexOf(q)>=0; })
+                        .sort(function(a,b){ return b.updated-a.updated; });
+  var g=$('grid');
+  if(!list.length){ g.innerHTML='<div class="empty">Aucune note. Touchez « + Nouvelle note ».</div>'; return; }
+  var h='';
+  list.forEach(function(n){
+    h+='<button class="card" data-id="'+n.id+'"><canvas width="164" height="218"></canvas><b>'+esc(n.title)+'</b><small>'+fmtDate(n.updated)+'</small></button>';
+  });
+  g.innerHTML=h;
+  var cards=g.querySelectorAll('.card');
+  for(var i=0;i<cards.length;i++){
+    var id=cards[i].getAttribute('data-id'), ctx=cards[i].querySelector('canvas').getContext('2d');
+    ctx.setTransform(164/PW,0,0,218/PH,0,0);
+    var d=loadNote(id); renderPage(ctx,d.pages[0],d.bgs[0],d.checks[0]);
+  }
+}
+function countCat(c){ return S.index.entries.filter(function(e){ return e.cat===c; }).length; }
+function renderCatList(){
+  var h='';
+  if(!S.index.cats.length) h='<div class="empty">Aucune catégorie.</div>';
+  S.index.cats.forEach(function(c){
+    h+='<button class="cat" data-c="'+esc(c)+'"><span>'+esc(c)+'</span><span>'+countCat(c)+'</span></button>';
+  });
+  $('catList').innerHTML=h;
+}
+function showLib(){
+  if(S.cur){ closeSend(); saveNoteNow(); S.cur=null; S.data=null; }
+  $('ed').className='hidden'; $('catView').className='hidden'; $('lib').className='';
+  setTab(S.tab);
+}
+
+/* ---------- Vue catégorie ---------- */
+function openCat(c){
+  S.catOpen=c;
+  $('lib').className='hidden'; $('ed').className='hidden'; $('catView').className='';
+  $('catName').innerHTML=esc(c);
+  renderEntries();
+}
+function renderEntries(){
+  var list=S.index.entries.filter(function(e){ return e.cat===S.catOpen; })
+                          .sort(function(a,b){ return (a.done?1:0)-(b.done?1:0) || b.created-a.created; });
+  if(!list.length){ $('entries').innerHTML='<div class="empty">Rien pour l\'instant. Dans une note, utilisez « Sélection » pour entourer un texte et l\'envoyer ici.</div>'; return; }
+  var h='';
+  list.forEach(function(e){
+    var n=e.noteId?findNote(e.noteId):null;
+    h+='<div class="entry'+(e.done?' done':'')+'" data-id="'+e.id+'">'+
+       '<button class="chk" data-a="done">'+(e.done?'☑':'☐')+'</button>'+
+       '<div class="body"><div class="txt">'+esc(e.text)+'</div>'+
+       '<div class="meta">'+fmtDate(e.created)+(n?' · depuis « '+esc(n.title)+' » p.'+(e.page+1):'')+'</div>'+
+       '<div class="acts">'+(n?'<button data-a="see">Voir la note</button>':'')+
+       '<button data-a="edit">Modifier</button><button data-a="del">Supprimer</button></div></div></div>';
+  });
+  $('entries').innerHTML=h;
+}
+function entryDialog(e){
+  var isNew=!e;
+  dialog(isNew?'Nouveau texte':'Modifier',
+    '<label>Texte</label><textarea id="dX">'+esc(e?e.text:'')+'</textarea>'+
+    '<label>Catégorie</label><select id="dC">'+catOptions(e?e.cat:S.catOpen)+'</select>',
+    [{label:'Annuler'},{label:'Enregistrer',primary:true,action:function(){
+      var t=$('dX').value.trim(); if(!t) return false;
+      if(isNew){ S.index.entries.push({id:uid(),cat:$('dC').value,text:t,noteId:null,page:0,box:null,created:Date.now(),done:false}); }
+      else { e.text=t; e.cat=$('dC').value; }
+      saveIndex(); renderEntries();
+    }}]);
+}
+
+/* ---------- Boîte de dialogue ---------- */
+function dialog(title,bodyHtml,buttons){
+  var h='<h2>'+esc(title)+'</h2>'+bodyHtml+'<div id="dlgBtns">';
+  buttons.forEach(function(b,i){ h+='<button data-i="'+i+'" class="'+(b.primary?'on':'')+'">'+esc(b.label)+'</button>'; });
+  $('dlgBox').innerHTML=h+'</div>'; $('dlg').className='';
+  var bs=$('dlgBtns').querySelectorAll('button');
+  for(var i=0;i<bs.length;i++) bs[i].onclick=(function(b){ return function(){
+    if(b.action && b.action()===false) return;
+    $('dlg').className='hidden';
+  }; })(buttons[i]);
+}
+function catOptions(sel){
+  return S.index.cats.map(function(c){ return '<option'+(c===sel?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
+}
+function bgOptions(sel){
+  return BGS.map(function(b){ return '<option value="'+b[0]+'"'+(b[0]===sel?' selected':'')+'>'+b[1]+'</option>'; }).join('');
+}
+function newNoteDialog(){
+  dialog('Nouvelle note',
+    '<label>Titre</label><input id="dT" type="text" value="Note du '+fmtDate(Date.now())+'">'+
+    '<label>Style de feuille</label><select id="dB">'+bgOptions('lines')+'</select>',
+    [{label:'Annuler'},{label:'Créer',primary:true,action:function(){
+      var n={ id:uid(), title:($('dT').value||'Sans titre').trim(), bg:$('dB').value, created:Date.now(), updated:Date.now() };
+      S.index.notes.push(n); saveIndex();
+      lsSet('kn_note_'+n.id, JSON.stringify({pages:[[]],bgs:[n.bg],checks:[{}]}));
+      openNote(n.id,0);
+    }}]);
+}
+function addCatDialog(after){
+  dialog('Nouvelle catégorie','<label>Nom</label><input id="dN" type="text">',
+    [{label:'Annuler'},{label:'Ajouter',primary:true,action:function(){
+      var v=($('dN').value||'').trim(); if(!v) return false;
+      if(S.index.cats.indexOf(v)<0){ S.index.cats.push(v); saveIndex(); }
+      if(after) after(v); else renderCatList();
+    }}]);
+}
+function editCatDialog(){
+  var old=S.catOpen;
+  dialog('Catégorie « '+old+' »','<label>Nouveau nom</label><input id="dN" type="text" value="'+esc(old)+'">',
+    [{label:'Supprimer',action:function(){
+      var n=countCat(old);
+      if(!confirm('Supprimer « '+old+' »'+(n?' et ses '+n+' texte(s)':'')+' ?')) return false;
+      S.index.cats=S.index.cats.filter(function(c){ return c!==old; });
+      S.index.entries=S.index.entries.filter(function(e){ return e.cat!==old; });
+      saveIndex(); S.tab='cats'; showLib();
+    }},{label:'Annuler'},{label:'Renommer',primary:true,action:function(){
+      var v=($('dN').value||'').trim(); if(!v) return false;
+      if(v!==old){
+        if(S.index.cats.indexOf(v)>=0){ alert('Cette catégorie existe déjà.'); return false; }
+        S.index.cats[S.index.cats.indexOf(old)]=v;
+        S.index.entries.forEach(function(e){ if(e.cat===old) e.cat=v; });
+        saveIndex(); openCat(v);
+      }
+    }}]);
+}
+function backupDialog(){
+  dialog('Sauvegarde',
+    '<p style="font-size:17px">Les notes sont gardées dans le navigateur de la liseuse. Exportez régulièrement une copie pour ne rien perdre.</p>'+
+    '<label>Restaurer depuis un fichier</label><input id="dF" type="file" accept=".json,application/json">',
+    [{label:'Fermer'},{label:'Restaurer',action:function(){
+      var f=$('dF').files && $('dF').files[0]; if(!f){ alert('Choisissez un fichier.'); return false; }
+      var r=new FileReader();
+      r.onload=function(){ try{
+        var all=JSON.parse(r.result); if(!all.index||!all.notes) throw 0;
+        all.index.notes.forEach(function(n){ if(!findNote(n.id)) S.index.notes.push(n); if(all.notes[n.id]) lsSet('kn_note_'+n.id, JSON.stringify(all.notes[n.id])); });
+        (all.index.cats||[]).forEach(function(c){ if(S.index.cats.indexOf(c)<0) S.index.cats.push(c); });
+        (all.index.entries||[]).forEach(function(e){ if(!findEntry(e.id)) S.index.entries.push(e); });
+        saveIndex(); setTab(S.tab); alert('Restauration terminée.');
+      }catch(e){ alert('Fichier invalide.'); } };
+      r.readAsText(f);
+    }},{label:'Exporter',primary:true,action:function(){
+      var all={ index:S.index, notes:{} };
+      S.index.notes.forEach(function(n){ all.notes[n.id]=loadNote(n.id); });
+      var blob=new Blob([JSON.stringify(all)],{type:'application/json'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='carnets-sauvegarde-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      return false;
+    }}]);
+}
+
+/* ---------- Éditeur ---------- */
+var pad=$('pad'), pctx=pad.getContext('2d'), scale=1;
+function layoutPad(){
+  var bar=$('bar').offsetHeight;
+  var w=Math.min(window.innerWidth-20,(window.innerHeight-bar-20)*PW/PH), h=w*PH/PW, dpr=window.devicePixelRatio||1;
+  pad.style.width=Math.floor(w)+'px'; pad.style.height=Math.floor(h)+'px';
+  pad.width=Math.floor(w*dpr); pad.height=Math.floor(h*dpr);
+  scale=pad.width/PW; redraw();
+}
+function strokes(){ return S.data.pages[S.page]; }
+function redraw(){
+  if(!S.data) return;
+  pctx.setTransform(scale,0,0,scale,0,0);
+  renderPage(pctx,strokes(),S.data.bgs[S.page],S.data.checks[S.page]);
+  // repères des textes déjà envoyés
+  pctx.font='italic 20px Georgia';
+  S.index.entries.forEach(function(e){
+    if(e.noteId!==S.cur.id || e.page!==S.page || !e.box) return;
+    dashRect(pctx,e.box,'#aaa',1.5);
+    var label='→ '+e.cat, tw=pctx.measureText(label).width, x=Math.max(0,e.box[2]-tw-6), y=Math.max(22,e.box[1]-6);
+    pctx.fillStyle='#fff'; pctx.fillRect(x-4,y-20,tw+10,26); pctx.fillStyle='#555'; pctx.fillText(label,x,y);
+  });
+  // sélection en cours
+  if(S.sel){
+    S.sel.idx.forEach(function(i){ drawStroke(pctx,strokes()[i],'#000'); });
+    dashRect(pctx,S.sel.box,'#000',3);
+  }
+  $('pageInfo').innerHTML=(S.page+1)+'/'+S.data.pages.length;
+  $('tBg').value=S.data.bgs[S.page];
+}
+function openNote(id,page){
+  S.cur=findNote(id); S.data=loadNote(id); S.page=Math.min(page||0,S.data.pages.length-1); S.undo=[]; S.redo=[]; S.sel=null;
+  $('noteTitle').value=S.cur.title;
+  $('lib').className='hidden'; $('catView').className='hidden'; $('ed').className='';
+  setTool('pen'); layoutPad();
+}
+function goPage(p){ closeSend(); S.page=p; redraw(); }
+function snapshot(){ S.undo.push({page:S.page,strokes:strokes().slice()}); if(S.undo.length>100) S.undo.shift(); S.redo=[]; }
+function restore(from,to){
+  var s=from.pop(); if(!s) return;
+  closeSend();
+  to.push({page:s.page,strokes:S.data.pages[s.page].slice()});
+  S.data.pages[s.page]=s.strokes; S.page=s.page; redraw(); saveNoteSoon();
+}
+function setTool(t){
+  S.tool=t;
+  $('tPen').className=t==='pen'?'on':''; $('tEraser').className=t==='eraser'?'on':''; $('tSelect').className=t==='select'?'on':'';
+}
+function toPage(e){
+  var r=pad.getBoundingClientRect();
+  return [Math.round((e.clientX-r.left)/r.width*PW), Math.round((e.clientY-r.top)/r.height*PH)];
+}
+function eraseAt(x,y){
+  var list=strokes(), R=18+S.width*2, R2=R*R, changed=false;
+  for(var i=list.length-1;i>=0;i--){
+    var p=list[i].p;
+    for(var j=0;j<p.length;j+=2){ var dx=p[j]-x, dy=p[j+1]-y; if(dx*dx+dy*dy<=R2){ list.splice(i,1); changed=true; break; } }
+  }
+  if(changed) redraw();
+}
+function inPoly(x,y,poly){
+  var inside=false;
+  for(var i=0,j=poly.length-2;i<poly.length;j=i,i+=2){
+    var xi=poly[i],yi=poly[i+1],xj=poly[j],yj=poly[j+1];
+    if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function strokeBox(s){
+  var p=s.p, b=[1e9,1e9,-1e9,-1e9];
+  for(var i=0;i<p.length;i+=2){ if(p[i]<b[0])b[0]=p[i]; if(p[i]>b[2])b[2]=p[i]; if(p[i+1]<b[1])b[1]=p[i+1]; if(p[i+1]>b[3])b[3]=p[i+1]; }
+  return b;
+}
+function finishLasso(poly){
+  var list=strokes(), idx=[];
+  if(poly.length>=6){
+    for(var i=0;i<list.length;i++){
+      var p=list[i].p, n=0;
+      for(var j=0;j<p.length;j+=2) if(inPoly(p[j],p[j+1],poly)) n++;
+      if(n*2>=p.length/2) idx.push(i);
+    }
+  }
+  if(!idx.length){ S.sel=null; redraw(); return; }
+  var box=[1e9,1e9,-1e9,-1e9];
+  idx.forEach(function(i){ var b=strokeBox(list[i]); box=[Math.min(box[0],b[0]),Math.min(box[1],b[1]),Math.max(box[2],b[2]),Math.max(box[3],b[3])]; });
+  S.sel={idx:idx, box:[box[0]-10,box[1]-10,box[2]+10,box[3]+10]};
+  redraw(); openSend();
+}
+
+function start(pt,erase){
+  closeSend();
+  if(!erase && S.tool!=='select' && S.data.bgs[S.page]==='checklist'){
+    var k=checkRowAt(pt[0],pt[1]);
+    if(k>=0){ var ch=S.data.checks[S.page]; ch[k]=!ch[k]; if(!ch[k]) delete ch[k]; redraw(); saveNoteSoon(); return; }
+  }
+  var t=erase?'eraser':S.tool;
+  if(t==='select'){ S.sel=null; redraw(); S.drawing={lasso:[pt[0],pt[1]]}; return; }
+  snapshot();
+  if(t==='eraser'){ S.drawing={erase:true}; eraseAt(pt[0],pt[1]); return; }
+  S.drawing={s:{w:S.width,p:[pt[0],pt[1]]}};
+  strokes().push(S.drawing.s);
+  pctx.setTransform(scale,0,0,scale,0,0); drawStroke(pctx,S.drawing.s);
+}
+function seg(ax,ay,bx,by,w){
+  pctx.setTransform(scale,0,0,scale,0,0);
+  pctx.strokeStyle='#000'; pctx.lineWidth=w; pctx.lineCap='round'; pctx.lineJoin='round';
+  pctx.beginPath(); pctx.moveTo(ax,ay); pctx.lineTo(bx,by); pctx.stroke();
+}
+function move(pt){
+  var d=S.drawing; if(!d) return;
+  if(d.erase){ eraseAt(pt[0],pt[1]); return; }
+  var p=d.lasso||d.s.p, lx=p[p.length-2], ly=p[p.length-1];
+  if(Math.abs(pt[0]-lx)+Math.abs(pt[1]-ly)<(d.lasso?6:2)) return;
+  p.push(pt[0],pt[1]);
+  if(d.lasso){ if((p.length/2)%2===0) seg(lx,ly,pt[0],pt[1],2); }   // trait pointillé
+  else seg(lx,ly,pt[0],pt[1],d.s.w);
+}
+function end(){
+  var d=S.drawing; if(!d) return;
+  S.drawing=null;
+  if(d.lasso){ finishLasso(d.lasso); return; }
+  if(d.erase && S.undo.length){ var last=S.undo[S.undo.length-1]; if(last.strokes.length===strokes().length) S.undo.pop(); }
+  saveNoteSoon();
+}
+
+if(window.PointerEvent){
+  var activeId=null;
+  pad.addEventListener('pointerdown',function(e){
+    if(e.pointerType==='pen') S.penSeen=true;
+    if(S.penSeen && e.pointerType==='touch') return;     // ignore la paume si le stylet est utilisé
+    if(activeId!==null) return;
+    activeId=e.pointerId;
+    try{ pad.setPointerCapture(e.pointerId); }catch(x){}
+    e.preventDefault();
+    start(toPage(e),(e.buttons&32)===32 || e.button===5);  // bouton gomme du stylet
+  });
+  pad.addEventListener('pointermove',function(e){
+    if(e.pointerId!==activeId) return;
+    e.preventDefault();
+    var evs=e.getCoalescedEvents?e.getCoalescedEvents():[e]; if(!evs.length) evs=[e];
+    for(var i=0;i<evs.length;i++) move(toPage(evs[i]));
+  });
+  var up=function(e){ if(e.pointerId!==activeId) return; activeId=null; end(); };
+  pad.addEventListener('pointerup',up); pad.addEventListener('pointercancel',up);
+} else {
+  pad.addEventListener('touchstart',function(e){ e.preventDefault(); if(e.touches.length===1) start(toPage(e.touches[0]),false); },{passive:false});
+  pad.addEventListener('touchmove',function(e){ e.preventDefault(); move(toPage(e.touches[0])); },{passive:false});
+  pad.addEventListener('touchend',function(e){ e.preventDefault(); end(); },{passive:false});
+  var md=false;
+  pad.addEventListener('mousedown',function(e){ md=true; start(toPage(e),false); });
+  window.addEventListener('mousemove',function(e){ if(md) move(toPage(e)); });
+  window.addEventListener('mouseup',function(){ if(md){ md=false; end(); } });
+}
+
+/* ---------- Reconnaissance d'écriture ---------- */
+// Découpe la sélection en lignes, puis envoie chaque ligne au service de reconnaissance manuscrite de Google (Wi-Fi requis).
+function splitLines(list){
+  var items=list.map(function(s,i){ var b=strokeBox(s); return {s:s,i:i,b:b,cy:(b[1]+b[3])/2}; })
+                .sort(function(a,b){ return a.cy-b.cy; });
+  var lines=[];
+  items.forEach(function(it){
+    var L=lines[lines.length-1];
+    if(L){ var tol=Math.max(20,(L.b[3]-L.b[1])*0.35);
+      if(it.cy>=L.b[1]-tol && it.cy<=L.b[3]+tol){ L.items.push(it); L.b=[Math.min(L.b[0],it.b[0]),Math.min(L.b[1],it.b[1]),Math.max(L.b[2],it.b[2]),Math.max(L.b[3],it.b[3])]; return; } }
+    lines.push({items:[it],b:it.b.slice()});
+  });
+  // rattache les petits morceaux (points sur les i, accents) à la ligne la plus proche
+  for(var k=lines.length-1;k>=0 && lines.length>1;k--){
+    var L=lines[k]; if(L.b[3]-L.b[1]>30) continue;
+    var best=-1,bd=1e9,cy=(L.b[1]+L.b[3])/2;
+    lines.forEach(function(M,m){ if(m===k) return; var d=Math.abs(cy-(M.b[1]+M.b[3])/2); if(d<bd){bd=d;best=m;} });
+    if(best>=0 && bd<90){ var M=lines[best]; M.items=M.items.concat(L.items); M.b=[Math.min(M.b[0],L.b[0]),Math.min(M.b[1],L.b[1]),Math.max(M.b[2],L.b[2]),Math.max(M.b[3],L.b[3])]; lines.splice(k,1); }
+  }
+  return lines.map(function(L){ L.items.sort(function(a,b){ return a.i-b.i; }); return L; });
+}
+function recognizeLine(L,cb){
+  var ink=[], t=0;
+  L.items.forEach(function(it){
+    var xs=[],ys=[],ts=[],p=it.s.p;
+    for(var j=0;j<p.length;j+=2){ xs.push(p[j]-L.b[0]); ys.push(p[j+1]-L.b[1]); ts.push(t); t+=10; }
+    ink.push([xs,ys,ts]); t+=100;
+  });
+  var body=JSON.stringify({options:'enable_pre_space',requests:[{
+    writing_guide:{writing_area_width:Math.max(1,L.b[2]-L.b[0]),writing_area_height:Math.max(1,L.b[3]-L.b[1])},
+    ink:ink, language:'fr' }]});
+  var x=new XMLHttpRequest();
+  x.open('POST','https://inputtools.google.com/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8',true);
+  x.setRequestHeader('Content-Type','application/json; charset=UTF-8');
+  x.timeout=15000;
+  x.onload=function(){ try{ var r=JSON.parse(x.responseText); if(r[0]!=='SUCCESS') throw 0; cb(r[1][0][1][0]||''); }catch(e){ cb(null); } };
+  x.onerror=x.ontimeout=function(){ cb(null); };
+  x.send(body);
+}
+function recognize(list,cb){
+  var lines=splitLines(list), out=[], k=0, failed=false;
+  (function next(){
+    if(k>=lines.length){ cb(failed?null:out.join('\n')); return; }
+    recognizeLine(lines[k++],function(txt){ if(txt===null) failed=true; else out.push(txt); next(); });
+  })();
+}
+
+/* ---------- Panneau d'envoi ---------- */
+var recogToken=0;
+function openSend(){
+  $('sendCat').innerHTML=catOptions(S.lastCat||S.index.cats[0]);
+  $('sendText').value=''; $('sendPanel').className='';
+  runRecog();
+}
+function runRecog(){
+  if(!S.sel) return;
+  var my=++recogToken, list=S.sel.idx.map(function(i){ return strokes()[i]; });
+  $('sendStatus').innerHTML='— reconnaissance en cours…';
+  recognize(list,function(txt){
+    if(my!==recogToken) return;
+    if(txt===null){ $('sendStatus').innerHTML='— échec (Wi-Fi ?). Vous pouvez taper le texte.'; return; }
+    $('sendStatus').innerHTML=''; $('sendText').value=txt;
+  });
+}
+function closeSend(){ recogToken++; $('sendPanel').className='hidden'; if(S.sel){ S.sel=null; if(S.data) redraw(); } }
+$('sendRetry').onclick=runRecog;
+$('sendCancel').onclick=closeSend;
+$('sendNewCat').onclick=function(){ addCatDialog(function(v){ $('sendCat').innerHTML=catOptions(v); }); };
+$('sendOk').onclick=function(){
+  var t=$('sendText').value.trim();
+  if(!S.sel) return;
+  if(!t){ alert('Le texte est vide.'); return; }
+  if(!S.index.cats.length){ alert('Créez d\'abord une catégorie.'); return; }
+  var c=$('sendCat').value; S.lastCat=c;
+  S.index.entries.push({id:uid(),cat:c,text:t,noteId:S.cur.id,page:S.page,box:S.sel.box,created:Date.now(),done:false});
+  saveIndex(); closeSend(); toast('Envoyé dans « '+c+' »');
+};
+
+/* ---------- Boutons ---------- */
+$('tabNotes').onclick=function(){ setTab('notes'); };
+$('tabCats').onclick=function(){ setTab('cats'); };
+$('btnNew').onclick=newNoteDialog;
+$('btnMenu').onclick=backupDialog;
+$('btnCatAdd').onclick=function(){ addCatDialog(); };
+$('q').oninput=function(){ S.q=this.value; renderGrid(); };
+$('grid').onclick=function(e){
+  var el=e.target; while(el && el!==this && el.className!=='card') el=el.parentNode;
+  if(el && el.className==='card') openNote(el.getAttribute('data-id'),0);
+};
+$('catList').onclick=function(e){
+  var el=e.target; while(el && el!==this && el.tagName!=='BUTTON') el=el.parentNode;
+  if(el && el.tagName==='BUTTON') openCat(el.getAttribute('data-c'));
+};
+$('btnCatBack').onclick=function(){ S.tab='cats'; showLib(); };
+$('btnCatEdit').onclick=editCatDialog;
+$('btnCatWrite').onclick=function(){ entryDialog(null); };
+$('entries').onclick=function(ev){
+  var b=ev.target; if(b.tagName!=='BUTTON') return;
+  var el=b; while(el && !(el.className && el.className.indexOf('entry')===0)) el=el.parentNode;
+  var e=findEntry(el.getAttribute('data-id')), a=b.getAttribute('data-a');
+  if(a==='done'){ e.done=!e.done; saveIndex(); renderEntries(); }
+  else if(a==='see'){ openNote(e.noteId,e.page); }
+  else if(a==='edit'){ entryDialog(e); }
+  else if(a==='del'){ if(confirm('Supprimer ce texte ?')){ S.index.entries=S.index.entries.filter(function(x){ return x!==e; }); saveIndex(); renderEntries(); } }
+};
+$('btnBack').onclick=function(){ S.tab='notes'; showLib(); };
+$('noteTitle').onchange=function(){ S.cur.title=(this.value||'Sans titre').trim(); saveIndex(); };
+$('tPen').onclick=function(){ closeSend(); setTool('pen'); };
+$('tEraser').onclick=function(){ closeSend(); setTool('eraser'); };
+$('tSelect').onclick=function(){ setTool('select'); };
+$('tWidth').onchange=function(){ S.width=+this.value; };
+$('tBg').innerHTML=bgOptions('lines');
+$('tBg').onchange=function(){ S.data.bgs[S.page]=this.value; S.cur.bg=this.value; saveNoteSoon(); redraw(); };
+$('tUndo').onclick=function(){ restore(S.undo,S.redo); };
+$('tRedo').onclick=function(){ restore(S.redo,S.undo); };
+$('pPrev').onclick=function(){ if(S.page>0) goPage(S.page-1); };
+$('pNext').onclick=function(){ if(S.page<S.data.pages.length-1) goPage(S.page+1); };
+$('pAdd').onclick=function(){
+  var p=S.page+1;
+  S.data.pages.splice(p,0,[]); S.data.bgs.splice(p,0,S.data.bgs[S.page]); S.data.checks.splice(p,0,{});
+  S.index.entries.forEach(function(e){ if(e.noteId===S.cur.id && e.page>=p) e.page++; });
+  saveIndex(); goPage(p); saveNoteSoon();
+};
+$('pMore').onclick=function(){
+  closeSend();
+  dialog('Options','<p style="font-size:17px">Page '+(S.page+1)+' sur '+S.data.pages.length+' de « '+esc(S.cur.title)+' »</p>',
+    [{label:'Effacer la page',action:function(){ snapshot(); S.data.pages[S.page]=[]; redraw(); saveNoteSoon(); }},
+     {label:'Supprimer la page',action:function(){
+       if(S.data.pages.length===1){ alert('La note doit garder au moins une page.'); return false; }
+       if(!confirm('Supprimer cette page ?')) return false;
+       var p=S.page, id=S.cur.id;
+       S.data.pages.splice(p,1); S.data.bgs.splice(p,1); S.data.checks.splice(p,1); S.undo=[]; S.redo=[];
+       S.index.entries.forEach(function(e){ if(e.noteId!==id) return; if(e.page===p){ e.noteId=null; e.box=null; } else if(e.page>p) e.page--; });
+       saveIndex(); if(S.page>=S.data.pages.length) S.page--; redraw(); saveNoteSoon();
+     }},
+     {label:'Supprimer la note',action:function(){
+       if(!confirm('Supprimer définitivement « '+S.cur.title+' » ? Les textes déjà envoyés dans les catégories sont conservés.')) return false;
+       var id=S.cur.id;
+       S.index.notes=S.index.notes.filter(function(n){ return n.id!==id; });
+       S.index.entries.forEach(function(e){ if(e.noteId===id){ e.noteId=null; e.box=null; } });
+       lsDel('kn_note_'+id); saveIndex(); S.cur=null; S.data=null; showLib();
+     }},
+     {label:'Fermer',primary:true}]);
+};
+window.addEventListener('resize',function(){ if(S.cur) layoutPad(); });
+window.addEventListener('pagehide',saveNoteNow);
+window.addEventListener('beforeunload',saveNoteNow);
+
+loadIndex(); showLib();
+})();
+</script>
+</body>
+</html>
